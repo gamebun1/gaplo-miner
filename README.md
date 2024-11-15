@@ -13,6 +13,10 @@ Gaplo Miner is a gas miner for the L1 network of APLO. It is designed for mining
    pip install -r requirments.txt
     ```
 
-2. Copy settings.ini.example to settings.ini and add the seed phrase to the seed_phrase field.
+2. Copy `settings.ini.example` to `settings.ini` and add the seed phrase to the seed_phrase field.
 
-3. When you have filled in the seed_phrase field, run private_key_receive.py
+3. When you have filled in the seed_phrase field, run `private_key_receive.py`
+
+4. start `gaplo_miner.py`
+
+5. We're happy to top up the wallet
