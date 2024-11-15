@@ -5,7 +5,7 @@ config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
 
 
-seed_phrase='pool gather divide mistake dial because tragic travel among name cricket bamboo'
+seed_phrase=config['Wallet']['seed_phrase']
 
 Account.enable_unaudited_hdwallet_features()
 account = Account.from_mnemonic(seed_phrase)
@@ -16,3 +16,6 @@ wallet_address = account.address
 
 print(f"Ваш адрес: {wallet_address}")
 print(f"Ваш закрытый ключ: {private_key}")
+
+config['Wallet']['wallet_address'] = wallet_address
+config['Wallet']['private_key'] = private_key
