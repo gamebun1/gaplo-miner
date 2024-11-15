@@ -3,7 +3,7 @@ from web3 import Web3
 import configparser
 import json
 from eth_hash.auto import keccak
-from eth_abi import encode
+from eth_abi.packed import encode_packed
 
 config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
@@ -47,7 +47,7 @@ def hash_nonce(nonce, sender, difficulty, prev_hash, total_mined):
     """Вычисляет хэш используя keccak256."""
     nonce_bytes = nonce.to_bytes(32, byteorder='big')
     
-    packed_data = encode(
+    packed_data = encode_packed(
         ['address', 'bytes32', 'uint256', 'uint256', 'uint256'],
         [
             sender,
