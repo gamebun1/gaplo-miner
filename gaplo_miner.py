@@ -93,7 +93,7 @@ def send_mine_transaction(nonce):
     priority_fees = fee_data['reward']
     average_priority_fee = sum(sum(fees) for fees in priority_fees) / len(priority_fees)
     
-    max_priority_fee_per_gas = web3.to_wei(1, 'gwei')
+    max_priority_fee_per_gas = web3.to_wei(50, 'gwei')
     max_fee_per_gas = base_fee + max_priority_fee_per_gas
     
     gas_estimate = contract.functions.mine(nonce_hex).estimate_gas({
@@ -122,7 +122,8 @@ while True:
     nonce = mine_block()
     tx_hash = send_mine_transaction(nonce)
     print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
-    web3.eth.wait_for_transaction_receipt(tx_hash)
+    web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
+    print("транзакция добавлена в блок")
     
     block_count1 = web3.eth.block_number
     block_count2 = web3.eth.block_number
