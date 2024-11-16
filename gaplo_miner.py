@@ -33,6 +33,8 @@ miner_params = {
 def get_miner_params():
     """Получает параметры майнера из контракта."""
     params = contract.functions.miner_params(wallet_address).call()
+    if params[1] == 0:
+        params[1] = DEFAULT_DIFFICULTY
     return {
         "last_block": params[0],
         "current_difficulty": params[1],
@@ -93,7 +95,7 @@ def send_mine_transaction(nonce):
     priority_fees = fee_data['reward']
     average_priority_fee = sum(sum(fees) for fees in priority_fees) / len(priority_fees)
     
-    max_priority_fee_per_gas = web3.to_wei(50, 'gwei')
+    max_priority_fee_per_gas = web3.to_wei(2, 'gwei')
     max_fee_per_gas = base_fee + max_priority_fee_per_gas
     
     gas_estimate = contract.functions.mine(nonce_hex).estimate_gas({
