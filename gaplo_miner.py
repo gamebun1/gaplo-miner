@@ -81,7 +81,6 @@ def mine_block():
             miner_params["last_block"] = web3.eth.block_number
             miner_params["prev_hash"] = hash_result
 
-            print(f"Блок замайнен! Nonce: {nonce}, Hash: {hash_result:x}")
             return nonce
         else:
             continue
@@ -124,8 +123,8 @@ while True:
     nonce = mine_block()
     tx_hash = send_mine_transaction(nonce)
     print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
-    web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
-    print("транзакция добавлена в блок")
+    receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
+    print(f"транзакция добавлена в блок: {receipt.blockNumber}")
     
     block_count1 = web3.eth.block_number
     block_count2 = web3.eth.block_number
