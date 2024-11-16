@@ -4,6 +4,7 @@ import configparser
 import json
 from eth_hash.auto import keccak
 from eth_abi.packed import encode_packed
+import time
 
 config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
@@ -123,4 +124,8 @@ while True:
     print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
     web3.eth.wait_for_transaction_receipt(tx_hash)
     
-    
+    block_count1 = web3.eth.block_number
+    block_count2 = web3.eth.block_number
+    while block_count2 - block_count1 < 20:
+        block_count2 = web3.eth.block_number
+        time.sleep(1)
