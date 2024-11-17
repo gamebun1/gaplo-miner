@@ -1,5 +1,5 @@
 import random
-import threading
+from multiprocessing import Process
 from web3 import Web3
 import configparser
 import json
@@ -12,7 +12,9 @@ config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
 
 wallets_file = 'wallets.json'
-max_wallets = 5
+max_wallets = int(config['Miner settings']['max_wallets'])
+
+gas_thresholds = float(config['Miner settings']['gas_thresholds'])
 
 web3 = Web3(Web3.HTTPProvider(config['SERVER']['RPC']))
 private_key = config['Wallet']['private_key']
@@ -158,10 +160,9 @@ def transfer_gas_to_new_wallet(new_wallet_address, amount):
     max_priority_fee_per_gas = web3.to_wei(1.3, 'gwei')
     max_fee_per_gas = base_fee + max_priority_fee_per_gas
     
-    gas_estimate = web3.eth.estimate_gas({
-        'to': new_wallet_address,
+    gas_estimate = contract.functions.transfer(new_wallet_address, web3.to_wei(amount, 'ether')).estimate_gas({
+        'from': wallet_address,
         'nonce': web3.eth.get_transaction_count(wallet_address),
-        'value': web3.to_wei(amount, 'ether'),
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas
     })
@@ -169,18 +170,20 @@ def transfer_gas_to_new_wallet(new_wallet_address, amount):
     if gas_estimate == 0:
         gas_estimate = 21000
     
-    transaction = contract.functions.build_transaction({
-        'to': new_wallet_address,
-        'value': web3.to_wei(amount, 'ether'),
+    transaction = contract.functions.transfer(new_wallet_address, web3.to_wei(amount, 'ether')).build_transaction({
         'chainId': 28282,
         'gas': gas_estimate,
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas,
-        'nonce': web3.eth.get_transaction_count(wallet_address, 'pending'),
+        'nonce': web3.eth.get_transaction_count(wallet_address),
     })
 
     signed_tx = web3.eth.account.sign_transaction(transaction, private_key=private_key)
     tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+    print(f"Транзакция {receipt.transactionHash.hex()} успешно выполнена. Транзакция попала в блок {receipt.blockNumber}.")
+
+
 
     return tx_hash
 
@@ -209,16 +212,34 @@ def main():
     while len(wallets) < max_wallets:
         new_wallet_address, new_private_key = create_new_wallet()
         try:
-            tx_hash = transfer_gas_to_new_wallet(new_wallet_address, 0.0001)
+            tx_hash = transfer_gas_to_new_wallet(new_wallet_address, gas_thresholds)
             print(f"Gas transferred to {new_wallet_address}. Transaction hash: {tx_hash.hex()}")
-            
+        
             add_wallet_to_file(new_wallet_address, new_private_key)
             
             wallets.append({'address': new_wallet_address, 'private_key': new_private_key})
             
-            threading.Thread(target=miner_thread, args=(new_wallet_address, new_private_key)).start()
+            Process(target=miner_thread, args=(new_wallet_address, new_private_key)).start()
         except Exception as e:
             print(f"Error during wallet setup: {e}")
+            
+    if 0 < len(wallets) <= max_wallets:
+        for wallet in wallets:
+            if wallet['address'] and wallet['private_key']:
+                if web3.eth.get_balance(wallet['address']) > gas_thresholds:
+                    print(f"Starting miner thread for wallet: {wallet['address']}")
+                    Process(target=miner_thread, args=(wallet['address'], wallet['private_key'])).start()
+                else:
+                    print(f"Insufficient balance for wallet: {wallet['address']}.")
+                    tx_hash = transfer_gas_to_new_wallet(wallet['address'], gas_thresholds)
+                    print(f"Gas transferred to {wallet['address']}. Transaction hash: {tx_hash.hex()}")
+                    Process(target=miner_thread, args=(wallet['address'], wallet['private_key'])).start()
+            else:
+                print("Invalid wallet data. Skipping miner thread.")
+    else:
+        print("No valid wallets available for mining.")
+
+
 
 if __name__ == "__main__":
     main()
