@@ -124,7 +124,7 @@ def send_mine_transaction(nonce, wallet_address, private_key):
     
     gas_estimate = contract.functions.mine(nonce_hex).estimate_gas({
         'from': wallet_address,
-        'nonce': web3.eth.get_transaction_count(wallet_address, 'pending'),
+        'nonce': web3.eth.get_transaction_count(wallet_address),
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas
     })
@@ -134,11 +134,17 @@ def send_mine_transaction(nonce, wallet_address, private_key):
         'gas': gas_estimate+1000,
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas,
-        'nonce': web3.eth.get_transaction_count(wallet_address, 'pending'),
+        'nonce': web3.eth.get_transaction_count(wallet_address),
     })
 
     signed_tx = web3.eth.account.sign_transaction(transaction, private_key=private_key)
     tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
+
+    receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
+    if receipt.status == 1:
+        print(f"Transaction {tx_hash.hex()} confirmed in block {receipt.blockNumber}")
+    else:
+        print(f"Transaction {tx_hash.hex()} failed with status {receipt.status}")
 
     return tx_hash
 
@@ -191,11 +197,6 @@ def transfer_gas_to_wallet(wallet_address, amount, sender_address, sender_privat
 def miner_thread(wallet_address, private_key, thread_count):
     """Поток для майнинга с использованием нового кошелька."""
     while True:    
-        if web3.eth.get_balance(wallet_address) >= gas_thresholds+(gas_thresholds*token_withdrawal_multiplier):
-            if miner_params['total_mined'] >= 20:
-                transfer_gas_to_wallet(main_wallet_address, gas_thresholds*token_withdrawal_multiplier, wallet_address, private_key)
-                transfer_gas_to_wallet('0x3200eEaBa4a47D58794727B5A4a8D04673Ec6772', gas_thresholds*token_withdrawal_multiplier*0.1, wallet_address, private_key)
-        
         output = f"Thread num: {thread_count}\n"
 
         miner_params = get_miner_params(wallet_address)
@@ -218,8 +219,7 @@ def miner_thread(wallet_address, private_key, thread_count):
             with open('log', '+a') as log:
                 log.write(f"reverted: {tx_hash.hex()}\n")
     
-        print(output)
-        print("--------------------------------------------------------------\n")
+        print(output+"\n--------------------------------------------------------------\n")
         
         block_count1 = web3.eth.block_number
         block_count2 = web3.eth.block_number
@@ -227,9 +227,11 @@ def miner_thread(wallet_address, private_key, thread_count):
             block_count2 = web3.eth.block_number
             time.sleep(1)
         
+        if web3.eth.get_balance(wallet_address) >= gas_thresholds+(gas_thresholds*token_withdrawal_multiplier):
+            if miner_params['total_mined'] >= 20:
+                transfer_gas_to_wallet(main_wallet_address, gas_thresholds*token_withdrawal_multiplier, wallet_address, private_key)
+                transfer_gas_to_wallet('0x3200eEaBa4a47D58794727B5A4a8D04673Ec6772', gas_thresholds*token_withdrawal_multiplier*0.1, wallet_address, private_key)
         
-        
-    
 
 def main():
     global wallets
@@ -253,6 +255,7 @@ def main():
             print(f"Error during wallet setup: {e}")
             
     if len(wallets) >= max_wallets and len(wallets) > 0:
+        wallets = wallets[:max_wallets]
         for wallet in wallets:
             if wallet['address'] and wallet['private_key']:
                 if web3.eth.get_balance(wallet['address']) > gas_thresholds:
