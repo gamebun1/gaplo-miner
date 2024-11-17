@@ -210,7 +210,7 @@ def miner_thread(wallet_address, private_key, thread_count):
         output += f"транзакция добавлена в блок: {receipt.blockNumber}\n"
         if receipt.status == 0:
             output += "reverted\n"
-            with open('log.txt', 'w') as log:
+            with open('log', '+a') as log:
                 log.write(f"reverted: {tx_hash.hex()}\n")
     
         print(output)
