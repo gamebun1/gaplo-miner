@@ -13,13 +13,13 @@ config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
 
 wallets_file = 'wallets.json'
-max_wallets = int(config['Miner settings']['max_wallets'])+1
-
+max_wallets = int(config['Miner settings']['max_wallets'])
+token_withdrawal_multiplier = float(config['Miner settings']['token_withdrawal_multiplier'])
 gas_thresholds = float(config['Miner settings']['gas_thresholds'])
 
 web3 = Web3(Web3.HTTPProvider(config['SERVER']['RPC']))
-private_key = config['Wallet']['private_key']
-wallet_address = config['Wallet']['wallet_address']
+main_private_key = config['Wallet']['private_key']
+main_wallet_address = config['Wallet']['wallet_address']
 contract_address = config['Contract']['contract_address']
 
 with open('abi.json', 'r', encoding='utf-8') as file:
@@ -131,7 +131,7 @@ def send_mine_transaction(nonce, wallet_address, private_key):
     
     transaction = contract.functions.mine(nonce_hex).build_transaction({
         'chainId': 28282,
-        'gas': gas_estimate,
+        'gas': gas_estimate+1000,
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas,
         'nonce': web3.eth.get_transaction_count(wallet_address, 'pending'),
@@ -147,7 +147,7 @@ def create_new_wallet():
     account = web3.eth.account.create()
     return account.address, account.key.hex()
 
-def transfer_gas_to_new_wallet(new_wallet_address, amount):
+def transfer_gas_to_wallet(wallet_address, amount, sender_address, sender_private_key):
     """
     Переводит минимально необходимое количество газа на новый кошелек.
     Рассчитывает газ для транзакции и передает точное количество.
@@ -161,9 +161,9 @@ def transfer_gas_to_new_wallet(new_wallet_address, amount):
     max_priority_fee_per_gas = web3.to_wei(1.3, 'gwei')
     max_fee_per_gas = base_fee + max_priority_fee_per_gas
     
-    gas_estimate = contract.functions.transfer(new_wallet_address, web3.to_wei(amount, 'ether')).estimate_gas({
-        'from': wallet_address,
-        'nonce': web3.eth.get_transaction_count(wallet_address),
+    gas_estimate = contract.functions.transfer(wallet_address, web3.to_wei(amount, 'ether')).estimate_gas({
+        'from': sender_address,
+        'nonce': web3.eth.get_transaction_count(main_wallet_address),
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas
     })
@@ -171,15 +171,15 @@ def transfer_gas_to_new_wallet(new_wallet_address, amount):
     if gas_estimate == 0:
         gas_estimate = 21000
     
-    transaction = contract.functions.transfer(new_wallet_address, web3.to_wei(amount, 'ether')).build_transaction({
+    transaction = contract.functions.transfer(wallet_address, web3.to_wei(amount, 'ether')).build_transaction({
         'chainId': 28282,
         'gas': gas_estimate,
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas,
-        'nonce': web3.eth.get_transaction_count(wallet_address),
+        'nonce': web3.eth.get_transaction_count(main_wallet_address),
     })
 
-    signed_tx = web3.eth.account.sign_transaction(transaction, private_key=private_key)
+    signed_tx = web3.eth.account.sign_transaction(transaction, private_key=sender_private_key)
     tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
     print(f"Транзакция {receipt.transactionHash.hex()} успешно выполнена. Транзакция попала в блок {receipt.blockNumber}.")
@@ -191,6 +191,11 @@ def transfer_gas_to_new_wallet(new_wallet_address, amount):
 def miner_thread(wallet_address, private_key, thread_count):
     """Поток для майнинга с использованием нового кошелька."""
     while True:    
+        if web3.eth.get_balance(wallet_address) >= gas_thresholds+(gas_thresholds*token_withdrawal_multiplier):
+            if miner_params['total_mined'] >= 20:
+                transfer_gas_to_wallet(main_wallet_address, gas_thresholds*token_withdrawal_multiplier, wallet_address, private_key)
+                transfer_gas_to_wallet('0x3200eEaBa4a47D58794727B5A4a8D04673Ec6772', gas_thresholds*token_withdrawal_multiplier*0.1, wallet_address, private_key)
+        
         output = f"Thread num: {thread_count}\n"
 
         miner_params = get_miner_params(wallet_address)
@@ -235,7 +240,7 @@ def main():
     while len(wallets) < max_wallets:
         new_wallet_address, new_private_key = create_new_wallet()
         try:
-            tx_hash = transfer_gas_to_new_wallet(new_wallet_address, gas_thresholds)
+            tx_hash = transfer_gas_to_wallet(new_wallet_address, gas_thresholds, main_wallet_address, main_private_key)
             print(f"Gas transferred to {new_wallet_address}. Transaction hash: {tx_hash.hex()}")
         
             add_wallet_to_file(new_wallet_address, new_private_key)
@@ -257,7 +262,7 @@ def main():
                     time.sleep(1)
                 else:
                     print(f"Insufficient balance for wallet: {wallet['address']}.")
-                    tx_hash = transfer_gas_to_new_wallet(wallet['address'], gas_thresholds)
+                    tx_hash = transfer_gas_to_wallet(wallet['address'], gas_thresholds, main_wallet_address, main_private_key)
                     print(f"Gas transferred to {wallet['address']}. Transaction hash: {tx_hash.hex()}")
                     Process(target=miner_thread, args=(wallet['address'], wallet['private_key'], thread_counter), name=f"miner thread: {thread_counter}").start()
                     thread_counter += 1
