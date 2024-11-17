@@ -121,6 +121,7 @@ while True:
     miner_params = get_miner_params()
     print(f"Текущая сложность: {miner_params['current_difficulty']}")
     print(f"Всего замайнено: {miner_params['total_mined']}")
+    print(f"Текущий баланс: {int(web3.eth.get_balance(wallet_address)) / 10**18}")
 
     while web3.eth.block_number - miner_params["last_block"] < 20:
         print("Слишком рано для майнинга, ждем...")
