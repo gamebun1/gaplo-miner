@@ -124,7 +124,7 @@ def send_mine_transaction(nonce, wallet_address, private_key):
     
     gas_estimate = contract.functions.mine(nonce_hex).estimate_gas({
         'from': wallet_address,
-        'nonce': web3.eth.get_transaction_count(wallet_address),
+        'nonce': web3.eth.get_transaction_count(wallet_address, 'pending'),
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas
     })
@@ -195,7 +195,7 @@ def miner_thread(wallet_address, private_key, thread_count):
 
         miner_params = get_miner_params(wallet_address)
         output += f"Текущая сложность: {miner_params['current_difficulty']}\n"
-        output += "Всего замайнено: {miner_params['total_mined']}\n"
+        output += f"Всего замайнено: {miner_params['total_mined']}\n"
         output += f"Текущий баланс: {int(web3.eth.get_balance(wallet_address)) / 10**18}\n"
 
         while web3.eth.block_number - miner_params["last_block"] < 20:
@@ -211,17 +211,19 @@ def miner_thread(wallet_address, private_key, thread_count):
         if receipt.status == 0:
             output += "reverted\n"
             with open('log.txt', 'w') as log:
-                log.write(f"reverted: {tx_hash.hex()}")
+                log.write(f"reverted: {tx_hash.hex()}\n")
     
-    
+        print(output)
+        print("--------------------------------------------------------------\n")
+        
         block_count1 = web3.eth.block_number
         block_count2 = web3.eth.block_number
         while block_count2 - block_count1 < 20:
             block_count2 = web3.eth.block_number
             time.sleep(1)
-        output += "--------------------------------------------------------------\n"
         
-        print(output)
+        
+        
     
 
 def main():
