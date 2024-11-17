@@ -134,6 +134,8 @@ while True:
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
     print(f"транзакция добавлена в блок: {receipt.blockNumber}")
     if receipt.status == 0:
+        with open('log', "a+") as log:
+            log.write(f"{time.datetime.now()} - Transaction reverted: {tx_hash.hex()}")
         print("reverted")
     
     
