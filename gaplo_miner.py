@@ -106,7 +106,7 @@ def send_mine_transaction(nonce):
     
     transaction = contract.functions.mine(nonce_hex).build_transaction({
         'chainId': 28282,
-        'gas': gas_estimate,
+        'gas': gas_estimate+1000,
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas,
         'nonce': web3.eth.get_transaction_count(wallet_address, 'pending'),
@@ -119,15 +119,26 @@ def send_mine_transaction(nonce):
 
 while True:
     miner_params = get_miner_params()
+    print(f"Текущая сложность: {miner_params['current_difficulty']}")
+    print(f"Всего замайнено: {miner_params['total_mined']}")
+
+    while web3.eth.block_number - miner_params["last_block"] < 20:
+        print("Слишком рано для майнинга, ждем...")
+        time.sleep(5)
+
     
     nonce = mine_block()
     tx_hash = send_mine_transaction(nonce)
     print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
     print(f"транзакция добавлена в блок: {receipt.blockNumber}")
+    if receipt.status == 0:
+        print("reverted")
+    
     
     block_count1 = web3.eth.block_number
     block_count2 = web3.eth.block_number
     while block_count2 - block_count1 < 20:
         block_count2 = web3.eth.block_number
         time.sleep(1)
+    print("--------------------------------------------------------------")
