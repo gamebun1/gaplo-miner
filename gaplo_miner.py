@@ -199,8 +199,8 @@ def miner_thread(wallet_address, private_key):
         time.sleep(5)
 
     
-    nonce = mine_block()
-    tx_hash = send_mine_transaction(nonce)
+    nonce = mine_block(wallet_address, private_key)
+    tx_hash = send_mine_transaction(nonce, wallet_address, private_key)
     print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
     receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
     print(f"транзакция добавлена в блок: {receipt.blockNumber}")
