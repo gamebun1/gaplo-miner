@@ -1,5 +1,6 @@
 import random
 from multiprocessing import Process
+import multiprocessing
 from web3 import Web3
 import configparser
 import json
@@ -12,7 +13,7 @@ config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
 
 wallets_file = 'wallets.json'
-max_wallets = int(config['Miner settings']['max_wallets'])
+max_wallets = int(config['Miner settings']['max_wallets'])+1
 
 gas_thresholds = float(config['Miner settings']['gas_thresholds'])
 
@@ -54,9 +55,9 @@ def add_wallet_to_file(wallet_address, private_key):
     wallets.append({'address': wallet_address, 'private_key': private_key})
     save_wallets(wallets)
 
-def get_miner_params():
+def get_miner_params(wallets_address):
     """Получает параметры майнера из контракта."""
-    params = contract.functions.miner_params(wallet_address).call()
+    params = contract.functions.miner_params(wallets_address).call()
     if params[1] == 0:
         params[1] = DEFAULT_DIFFICULTY
     return {
@@ -187,38 +188,47 @@ def transfer_gas_to_new_wallet(new_wallet_address, amount):
 
     return tx_hash
 
-def miner_thread(wallet_address, private_key):
+def miner_thread(wallet_address, private_key, thread_count):
     """Поток для майнинга с использованием нового кошелька."""
-    miner_params = get_miner_params()
-    print(f"Текущая сложность: {miner_params['current_difficulty']}")
-    print(f"Всего замайнено: {miner_params['total_mined']}")
-    print(f"Текущий баланс: {int(web3.eth.get_balance(wallet_address)) / 10**18}")
+    while True:    
+        output = f"Thread num: {thread_count}\n"
 
-    while web3.eth.block_number - miner_params["last_block"] < 20:
-        print("Слишком рано для майнинга, ждем...")
-        time.sleep(5)
+        miner_params = get_miner_params(wallet_address)
+        output += f"Текущая сложность: {miner_params['current_difficulty']}\n"
+        output += "Всего замайнено: {miner_params['total_mined']}\n"
+        output += f"Текущий баланс: {int(web3.eth.get_balance(wallet_address)) / 10**18}\n"
+
+        while web3.eth.block_number - miner_params["last_block"] < 20:
+            print("Слишком рано для майнинга, ждем...")
+            time.sleep(5)
 
     
-    nonce = mine_block(wallet_address, private_key)
-    tx_hash = send_mine_transaction(nonce, wallet_address, private_key)
-    print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
-    receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
-    print(f"транзакция добавлена в блок: {receipt.blockNumber}")
-    if receipt.status == 0:
-        print("reverted")
+        nonce = mine_block(wallet_address, private_key)
+        tx_hash = send_mine_transaction(nonce, wallet_address, private_key)
+        output += f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}\n"
+        receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
+        output += f"транзакция добавлена в блок: {receipt.blockNumber}\n"
+        if receipt.status == 0:
+            output += "reverted\n"
+            with open('log.txt', 'w') as log:
+                log.write(f"reverted: {tx_hash.hex()}")
     
     
-    block_count1 = web3.eth.block_number
-    block_count2 = web3.eth.block_number
-    while block_count2 - block_count1 < 20:
+        block_count1 = web3.eth.block_number
         block_count2 = web3.eth.block_number
-        time.sleep(1)
-    print("--------------------------------------------------------------")
+        while block_count2 - block_count1 < 20:
+            block_count2 = web3.eth.block_number
+            time.sleep(1)
+        output += "--------------------------------------------------------------\n"
+        
+        print(output)
+    
 
 def main():
     global wallets
     
     wallets = load_wallets()
+    thread_counter = 1
 
     while len(wallets) < max_wallets:
         new_wallet_address, new_private_key = create_new_wallet()
@@ -230,21 +240,27 @@ def main():
             
             wallets.append({'address': new_wallet_address, 'private_key': new_private_key})
             
-            Process(target=miner_thread, args=(new_wallet_address, new_private_key)).start()
+            Process(target=miner_thread, args=(new_wallet_address, new_private_key, thread_counter), name=f"miner thread: {thread_counter}").start()
+            thread_counter += 1
         except Exception as e:
             print(f"Error during wallet setup: {e}")
             
-    if 0 < len(wallets) <= max_wallets:
+    if len(wallets) >= max_wallets and len(wallets) > 0:
         for wallet in wallets:
             if wallet['address'] and wallet['private_key']:
                 if web3.eth.get_balance(wallet['address']) > gas_thresholds:
                     print(f"Starting miner thread for wallet: {wallet['address']}")
-                    Process(target=miner_thread, args=(wallet['address'], wallet['private_key'])).start()
+                    Process(target=miner_thread, args=(wallet['address'], wallet['private_key'], thread_counter), name=f"miner thread: {thread_counter}").start()
+                    thread_counter += 1
+                    time.sleep(1)
                 else:
                     print(f"Insufficient balance for wallet: {wallet['address']}.")
                     tx_hash = transfer_gas_to_new_wallet(wallet['address'], gas_thresholds)
                     print(f"Gas transferred to {wallet['address']}. Transaction hash: {tx_hash.hex()}")
-                    Process(target=miner_thread, args=(wallet['address'], wallet['private_key'])).start()
+                    Process(target=miner_thread, args=(wallet['address'], wallet['private_key'], thread_counter), name=f"miner thread: {thread_counter}").start()
+                    thread_counter += 1
+                    time.sleep(1)
+
             else:
                 print("Invalid wallet data. Skipping miner thread.")
     else:
