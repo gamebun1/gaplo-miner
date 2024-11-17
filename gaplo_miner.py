@@ -189,20 +189,31 @@ def transfer_gas_to_new_wallet(new_wallet_address, amount):
 
 def miner_thread(wallet_address, private_key):
     """Поток для майнинга с использованием нового кошелька."""
-    while True:
-        miner_params = get_miner_params()
-        
-        nonce = mine_block(wallet_address, private_key)
-        tx_hash = send_mine_transaction(nonce, wallet_address, private_key)
-        print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
-        receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
-        print(f"транзакция добавлена в блок: {receipt.blockNumber}")
-        
-        block_count1 = web3.eth.block_number
+    miner_params = get_miner_params()
+    print(f"Текущая сложность: {miner_params['current_difficulty']}")
+    print(f"Всего замайнено: {miner_params['total_mined']}")
+    print(f"Текущий баланс: {int(web3.eth.get_balance(wallet_address)) / 10**18}")
+
+    while web3.eth.block_number - miner_params["last_block"] < 20:
+        print("Слишком рано для майнинга, ждем...")
+        time.sleep(5)
+
+    
+    nonce = mine_block()
+    tx_hash = send_mine_transaction(nonce)
+    print(f"Токен добыт и отправлен в транзакции: {tx_hash.hex()}")
+    receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
+    print(f"транзакция добавлена в блок: {receipt.blockNumber}")
+    if receipt.status == 0:
+        print("reverted")
+    
+    
+    block_count1 = web3.eth.block_number
+    block_count2 = web3.eth.block_number
+    while block_count2 - block_count1 < 20:
         block_count2 = web3.eth.block_number
-        while block_count2 - block_count1 < 20:
-            block_count2 = web3.eth.block_number
-            time.sleep(1)
+        time.sleep(1)
+    print("--------------------------------------------------------------")
 
 def main():
     global wallets
