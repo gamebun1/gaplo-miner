@@ -167,7 +167,6 @@ def transfer_gas_to_wallet(wallet_address, amount, sender_address, sender_privat
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas
     })
-    print(f"Gas estimate {gas_estimate}")
     
     if gas_estimate == 0:
         gas_estimate = 21000
@@ -179,7 +178,6 @@ def transfer_gas_to_wallet(wallet_address, amount, sender_address, sender_privat
         'maxPriorityFeePerGas': max_priority_fee_per_gas,
         'nonce': web3.eth.get_transaction_count(sender_address, 'pending'),
     })
-    print(web3.eth.get_transaction_count(main_wallet_address))
 
     signed_tx = web3.eth.account.sign_transaction(transaction, private_key=sender_private_key)
     tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
@@ -196,7 +194,6 @@ def miner_thread(wallet_address, private_key, thread_count):
         output = f"Thread num: {thread_count}\n"
 
         miner_params = get_miner_params(wallet_address)
-        print(miner_params)
         output += f"Текущая сложность: {miner_params['current_difficulty']}\n"
         output += f"Всего замайнено: {miner_params['total_mined']}\n"
         output += f"Текущий баланс: {int(web3.eth.get_balance(wallet_address)) / 10**18}\n"
