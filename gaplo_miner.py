@@ -135,7 +135,7 @@ while True:
     print(f"транзакция добавлена в блок: {receipt.blockNumber}")
     if receipt.status == 0:
         with open('log', "a+") as log:
-            log.write(f"{time.datetime.now()} - Transaction reverted: {tx_hash.hex()}")
+            log.write(f"Transaction reverted: {tx_hash.hex()}")
         print("reverted")
     
     
