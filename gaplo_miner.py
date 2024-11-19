@@ -264,6 +264,13 @@ def main():
     if len(wallets) >= max_wallets and len(wallets) > 0:
         wallets = wallets[:max_wallets]
         for wallet in wallets:
+            if web3.eth.get_balance(wallet['address']) <= (gas_thresholds/2)*10**18:
+                    tx_hash = transfer_gas_to_wallet(wallet['address'], gas_thresholds, main_wallet_address, main_private_key)
+                    receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
+                    if receipt.status == 0:
+                        with open('log', '+a') as log:
+                            log.write(f"Transaction reverted: {tx_hash.hex()}\n")
+
             if wallet['address'] and wallet['private_key']:
                 if web3.eth.get_balance(wallet['address']) > gas_thresholds:
                     print(f"Starting miner thread for wallet: {wallet['address']}")
