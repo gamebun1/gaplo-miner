@@ -238,11 +238,11 @@ def miner_thread(wallet_address, private_key, thread_count, log_level):
             output += f"Total mined: {miner_params['total_mined']}\n"
             output += f"Current balance: {int(web3.eth.get_balance(wallet_address)) / 10**18}\n"
 
+            nonce = mine_block(wallet_address, private_key)
+            
             while web3.eth.block_number - miner_params["last_block"] < 20:
-                print("Too early for mining, waiting...")
                 time.sleep(5)
 
-            nonce = mine_block(wallet_address, private_key)
             tx_hash, receipt = send_mine_transaction(nonce, wallet_address, private_key, log_level)
             output += f"Token mined and sent in transaction: {tx_hash.hex()}\n"
             output += f"Transaction added to block: {receipt.blockNumber}\n"
@@ -253,12 +253,6 @@ def miner_thread(wallet_address, private_key, thread_count, log_level):
                     log.write(f"Transaction reverted: {tx_hash.hex()}\n")
         
             print(output+"\n--------------------------------------------------------------\n")
-            
-            block_count1 = web3.eth.block_number
-            block_count2 = web3.eth.block_number
-            while block_count2 - block_count1 < 20:
-                block_count2 = web3.eth.block_number
-                time.sleep(1)
 
             if web3.eth.get_balance(wallet_address)/10**18 >= gas_thresholds+(gas_thresholds*token_withdrawal_multiplier)+gas_thresholds*token_withdrawal_multiplier*0.1+((gas_thresholds*token_withdrawal_multiplier)+gas_thresholds*token_withdrawal_multiplier*0.1)*0.01:
                 if miner_params['total_mined'] >= 20:
