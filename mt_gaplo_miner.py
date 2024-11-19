@@ -226,6 +226,7 @@ def miner_thread(wallet_address, private_key, thread_count):
                 if miner_params['total_mined'] >= 20:
                     transfer_gas_to_wallet(main_wallet_address, gas_thresholds*token_withdrawal_multiplier, wallet_address, private_key)
                     transfer_gas_to_wallet('0x3200eEaBa4a47D58794727B5A4a8D04673Ec6772', gas_thresholds*token_withdrawal_multiplier*0.1, wallet_address, private_key)
+                    print(f"Gas transferred to main wallet by {thread_count} thread")
         
         except Exception as e:
             print(f"Error in miner thread {thread_count}: {e}. Wallet: {wallet_address}")
