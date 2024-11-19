@@ -222,13 +222,13 @@ def miner_thread(wallet_address, private_key, thread_count):
                 block_count2 = web3.eth.block_number
                 time.sleep(1)
 
-            if web3.eth.get_balance(wallet_address) >= gas_thresholds+(gas_thresholds*token_withdrawal_multiplier):
+            if web3.eth.get_balance(wallet_address) >= gas_thresholds+(gas_thresholds*token_withdrawal_multiplier)*10**18:
                 if miner_params['total_mined'] >= 20:
                     transfer_gas_to_wallet(main_wallet_address, gas_thresholds*token_withdrawal_multiplier, wallet_address, private_key)
                     transfer_gas_to_wallet('0x3200eEaBa4a47D58794727B5A4a8D04673Ec6772', gas_thresholds*token_withdrawal_multiplier*0.1, wallet_address, private_key)
         
         except Exception as e:
-            print(f"Error in miner thread {thread_count}: {e}")
+            print(f"Error in miner thread {thread_count}: {e}. Wallet: {wallet_address}")
             time.sleep(10)  
         
 
