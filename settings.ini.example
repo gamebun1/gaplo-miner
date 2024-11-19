@@ -8,3 +8,9 @@ wallet_address=ВАШ_АДРЕС_КОШЕЛЬКА
 
 [Contract]
 contract_address=АДРЕС_КОНТРАКТА
+
+[Miner settings]
+max_wallets=20
+gas_thresholds=0.01
+token_withdrawal_multiplier=0.001
+log_level=0
