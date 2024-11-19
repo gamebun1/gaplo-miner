@@ -8,6 +8,7 @@ from eth_hash.auto import keccak
 from eth_abi.packed import encode_packed
 import time
 import os
+import secrets
 
 config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
@@ -70,7 +71,7 @@ def get_miner_params(wallets_address):
 
 def generate_nonce():
     """Generates a random nonce for mining."""
-    return random.getrandbits(256)
+    return secrets.randbits(256)
 
 def hash_nonce(nonce, sender, difficulty, prev_hash, total_mined):
     """Calculates the hash using keccak256."""
@@ -126,9 +127,11 @@ def send_mine_transaction(nonce, wallet_address, private_key, log_level):
     max_priority_fee_per_gas = web3.to_wei(2, 'gwei')
     max_fee_per_gas = base_fee + max_priority_fee_per_gas
     
+    print(web3.eth.get_transaction_count(wallet_address), wallet_address)
+    
     gas_estimate = contract.functions.mine(nonce_hex).estimate_gas({
         'from': wallet_address,
-        'nonce': web3.eth.get_transaction_count(wallet_address, 'pending'),
+        'nonce': web3.eth.get_transaction_count(wallet_address),
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas
     })
@@ -289,15 +292,13 @@ def main():
             
             wallets.append({'address': new_wallet_address, 'private_key': new_private_key})
             
-            Process(target=miner_thread, args=(new_wallet_address, new_private_key, thread_counter, log_level), name=f"miner thread: {thread_counter}").start()
-            thread_counter += 1
         except Exception as e:
             print(f"Error during wallet setup: {e}")
             
     if len(wallets) >= max_wallets and len(wallets) > 0:
         wallets = wallets[:max_wallets]
         for wallet in wallets:
-            if web3.eth.get_balance(wallet['address']) <= (gas_thresholds/2)*10**18:
+            if web3.eth.get_balance(wallet['address']) <= (gas_thresholds/1.5)*10**18:
                     tx_hash = transfer_gas_to_wallet(wallet['address'], gas_thresholds, main_wallet_address, main_private_key, log_level)
                     receipt = web3.eth.wait_for_transaction_receipt(tx_hash, timeout=1000)
                     if receipt.status == 0:
