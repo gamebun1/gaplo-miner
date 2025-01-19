@@ -8,7 +8,7 @@ Gaplo Miner is a gas miner for the L1 network of APLO. It is designed for mining
 
 1. Clone the repository:
    ```bash
-   https://github.com/gamebun1/gaplo-miner.git
+   git https://github.com/gamebun1/gaplo-miner.git
    cd gaplo-miner
    pip install -r requirments.txt
     ```
