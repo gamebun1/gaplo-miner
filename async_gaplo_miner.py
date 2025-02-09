@@ -9,6 +9,7 @@ from eth_abi.packed import encode_packed
 import time
 import os
 import secrets
+import logging
 
 config = configparser.ConfigParser()
 config.read('settings.ini', encoding='utf-8')
@@ -31,6 +32,8 @@ contract = async_web3.eth.contract(address=async_web3.to_checksum_address(contra
 
 DEFAULT_DIFFICULTY = int("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 BLOCK_REWARD = 10**10  
+
+logging.basicConfig(filename='miner_errors.log', level=logging.ERROR, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 def load_wallets():
     if os.path.exists(wallets_file):
