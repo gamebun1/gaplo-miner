@@ -29,15 +29,8 @@ with open('abi.json', 'r', encoding='utf-8') as file:
 
 contract = web3.eth.contract(address=Web3.to_checksum_address(contract_address), abi=gaplo_abi)
 
-DEFAULT_DIFFICULTY = int("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+DEFAULT_DIFFICULTY = int("0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 BLOCK_REWARD = 10**10  
-
-miner_params = {
-    "last_block": 0,
-    "current_difficulty": DEFAULT_DIFFICULTY,
-    "total_mined": 0,
-    "prev_hash": 0 
-}
 
 def load_wallets():
     """Loads wallets from a JSON file."""
@@ -69,10 +62,6 @@ def get_miner_params(wallets_address):
         "prev_hash": params[3]
     }
 
-def generate_nonce():
-    """Generates a random nonce for mining."""
-    return secrets.randbits(256)
-
 def hash_nonce(nonce, sender, difficulty, prev_hash, total_mined):
     """Calculates the hash using keccak256."""
     nonce_bytes = nonce.to_bytes(32, byteorder='big')
@@ -91,10 +80,10 @@ def hash_nonce(nonce, sender, difficulty, prev_hash, total_mined):
     hash_value = keccak(packed_data)
     return int.from_bytes(hash_value, byteorder='big')
 
-def mine_block(wallet_address, private_key):
+def mine_block(wallet_address, private_key, miner_params):
     """Attempts to mine a block by finding a nonce that matches the target difficulty."""
     while True:
-        nonce = generate_nonce()
+        nonce = secrets.randbits(256) #generating a random nonce for mining
         hash_result = hash_nonce(
             nonce,
             wallet_address,
@@ -129,12 +118,16 @@ def send_mine_transaction(nonce, wallet_address, private_key, log_level):
     
     print(web3.eth.get_transaction_count(wallet_address), wallet_address)
     
-    gas_estimate = contract.functions.mine(nonce_hex).estimate_gas({
-        'from': wallet_address,
-        'nonce': web3.eth.get_transaction_count(wallet_address),
-        'maxFeePerGas': max_fee_per_gas,
-        'maxPriorityFeePerGas': max_priority_fee_per_gas
-    })
+    try:
+        gas_estimate = contract.functions.mine(nonce_hex).estimate_gas({
+            'from': wallet_address,
+            'nonce': web3.eth.get_transaction_count(wallet_address),
+            'maxFeePerGas': max_fee_per_gas,
+            'maxPriorityFeePerGas': max_priority_fee_per_gas
+        })
+    except Exception as e:
+        print(f"Error in estimating gas for transfer: {e}")
+        return None
     
     if log_level == 3:
         out += f"nonce hex: {nonce_hex}"
@@ -175,8 +168,10 @@ def transfer_gas_to_wallet(wallet_address, amount, sender_address, sender_privat
     Calculates the gas for the transaction and transfers the exact amount.
     """
     
+    out = ""
+    
     if log_level == 3:
-        out = f"Transferring {amount} ETH to {wallet_address} by sender {sender_address}"
+        out = f"Transferring {amount} GAPLO to {wallet_address} by sender {sender_address}"
     
     fee_data = web3.eth.fee_history(1, 'latest', [10, 20, 30])
     base_fee = fee_data['baseFeePerGas'][-1]
@@ -231,6 +226,13 @@ def transfer_gas_to_wallet(wallet_address, amount, sender_address, sender_privat
 
 def miner_thread(wallet_address, private_key, thread_count, log_level):
     """Thread for mining using a new wallet."""
+    miner_params = {
+        "last_block": 0,
+        "current_difficulty": DEFAULT_DIFFICULTY,
+        "total_mined": 0,
+        "prev_hash": 0 
+    }
+    
     while True:    
         try:
             output = f"Thread num: {thread_count}\n"
@@ -244,7 +246,7 @@ def miner_thread(wallet_address, private_key, thread_count, log_level):
                 print("Too early for mining, waiting...")
                 time.sleep(5)
 
-            nonce = mine_block(wallet_address, private_key)
+            nonce = mine_block(wallet_address, private_key, miner_params)
             tx_hash, receipt = send_mine_transaction(nonce, wallet_address, private_key, log_level)
             output += f"Token mined and sent in transaction: {tx_hash.hex()}\n"
             output += f"Transaction added to block: {receipt.blockNumber}\n"

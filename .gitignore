@@ -4,3 +4,4 @@ settings2.ini
 wallets.json
 log
 miner_errors.log
+venv

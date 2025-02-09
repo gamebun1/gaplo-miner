@@ -30,7 +30,7 @@ with open('abi.json', 'r', encoding='utf-8') as file:
 
 contract = async_web3.eth.contract(address=async_web3.to_checksum_address(contract_address), abi=gaplo_abi)
 
-DEFAULT_DIFFICULTY = int("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+DEFAULT_DIFFICULTY = int("0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 BLOCK_REWARD = 10**10  
 
 logging.basicConfig(filename='miner_errors.log', level=logging.ERROR, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -123,34 +123,69 @@ def create_new_wallet():
     return account.address, account.key.hex()
 
 async def transfer_gas_to_wallet(wallet_address, amount, sender_address, sender_private_key, log_level):
+    """
+    Asynchronously transfers the minimum required amount of gas to a new wallet.
+    Uses the contract's transfer function, estimates the gas needed, builds and signs
+    the transaction, then sends it and logs details based on the log_level.
+    """
+    out = ""
+    
+    if log_level == 3:
+        out = f"Transferring {amount} GAPLO to {wallet_address} by sender {sender_address}\n"
+    
     fee_data = await async_web3.eth.fee_history(1, 'latest', [10, 20, 30])
     base_fee = fee_data['baseFeePerGas'][-1]
     max_priority_fee_per_gas = async_web3.to_wei(1.3, 'gwei')
     max_fee_per_gas = base_fee + max_priority_fee_per_gas
+
+    
     nonce = await async_web3.eth.get_transaction_count(sender_address, 'pending')
-    gas_estimate = await async_web3.eth.estimate_gas({
+    gas_estimate = await contract.functions.transfer(wallet_address, async_web3.to_wei(amount, 'ether')).estimate_gas({
         'from': sender_address,
-        'to': wallet_address,
-        'value': async_web3.to_wei(amount, 'ether'),
         'nonce': nonce,
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas
     })
+    
+    if log_level == 3:
+        out += f"Gas estimate: {gas_estimate}\n"
+    
     if gas_estimate == 0:
         gas_estimate = 21000
-    transaction = {
+    transaction = await contract.functions.transfer(wallet_address, async_web3.to_wei(amount, 'ether')).build_transaction({
         'chainId': 28282,
-        'to': wallet_address,
-        'value': async_web3.to_wei(amount, 'ether'),
         'gas': gas_estimate,
         'maxFeePerGas': max_fee_per_gas,
         'maxPriorityFeePerGas': max_priority_fee_per_gas,
         'nonce': nonce,
-    }
-    signed_tx = Account.sign_transaction(transaction, private_key=sender_private_key)
+    })
+    
+    if log_level == 3:
+        out += f"Transaction: {transaction}\n"
+
+    
+    signed_tx = async_web3.eth.account.sign_transaction(transaction, private_key=sender_private_key)
     tx_hash = await async_web3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    
+    
     receipt = await async_web3.eth.wait_for_transaction_receipt(tx_hash)
+    
+    
+    if log_level == 2:
+        if receipt.status == 1:
+            print(f"Transaction {receipt.transactionHash.hex()} successfully executed. Transaction included in block {receipt.blockNumber}.")
+        else:
+            print(f"Transaction {receipt.transactionHash.hex()} failed.")
+    elif log_level == 3:
+        out += f"Receipt: {receipt}\n"
+        if receipt.status == 1:
+            out += f"Transaction {receipt.transactionHash.hex()} successfully executed. Transaction included in block {receipt.blockNumber}."
+        else:
+            out += f"Transaction {receipt.transactionHash.hex()} failed."
+        print(out)
+    
     return tx_hash
+
 
 async def miner_thread(wallet_address, private_key, thread_count, log_level):
     while True:
