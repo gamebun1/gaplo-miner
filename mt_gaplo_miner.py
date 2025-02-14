@@ -242,7 +242,7 @@ def miner_thread(wallet_address, private_key, thread_count, log_level):
             output += f"Total mined: {miner_params['total_mined']}\n"
             output += f"Current balance: {int(web3.eth.get_balance(wallet_address)) / 10**18}\n"
 
-            nonce = mine_block(wallet_address, private_key)
+            nonce = mine_block(wallet_address, private_key, miner_params)
             
             while web3.eth.block_number - miner_params["last_block"] < 20:
                 time.sleep(5)
